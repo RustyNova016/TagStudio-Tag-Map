@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+
+	<head>
+		<title>Tag Map</title>
+		<meta charset="utf-8"/>
+		<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+
+		<script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+		<script src="//cdn.jsdelivr.net/npm/force-graph"></script>
+		<style>
+			html, body, #graph {
+				width: 100%;
+				height: 100%;
+				margin: 0;
+				padding: 0;
+				overflow: hidden;
+			}
+		</style>
+	</head>
+
+	<body>
+		<div id="graph"></div>
+
+		<script>
+			const container = document.getElementById( "graph" )
+			const width = container.clientWidth
+			const height = container.clientHeight
+
+			const highlightedNodes = new Set()
+			const highlightedLinks = new Set()
+
+			fetch( "./data.json" ).then( res => res.json() ).then( data => {
+				// Cross-link nodes
+				for ( const link of data.links ) {
+
+					const sourceNode = data.nodes.find( node => node.id === link.source )
+					const targetNode = data.nodes.find( node => node.id === link.target )
+
+					if ( !targetNode || !sourceNode ) continue
+
+					// Neighbors
+					if ( !sourceNode?.neighbors ) sourceNode.neighbors = []
+					if ( !targetNode?.neighbors ) targetNode.neighbors = []
+
+					sourceNode.neighbors.push( targetNode )
+					targetNode.neighbors.push( sourceNode )
+
+					// Links
+					if ( !sourceNode?.links ) sourceNode.links = []
+					if ( !targetNode?.links ) targetNode.links = []
+
+					sourceNode.links.push( link )
+					targetNode.links.push( link )
+				}
+
+				const graph = new ForceGraph( container )
+					.graphData( data )
+					.autoPauseRedraw( false )
+
+					// Style
+					.backgroundColor( "#101020" )
+
+					// Nodes
+					.nodeId( "id" )
+					.nodeVal( "val" )
+					.nodeLabel( "label" )
+					.nodeColor( node => {
+						if ( highlightedNodes.size === 0 ) return node.color
+						if ( highlightedNodes.has( node ) ) return node.color
+						else return "rgba(63, 72, 204, 0.35)"
+					})
+					.nodeRelSize( 3 )
+
+					// Links
+					.linkSource( "source" )
+					.linkTarget( "target" )
+					.linkWidth( link => {
+						if ( highlightedLinks.size === 0 ) return 2
+						if ( highlightedLinks.has( link ) ) return 3
+						else return 1
+					})
+					.linkColor( link => {
+						if ( highlightedLinks.size === 0 ) return "rgba(255, 255, 255, 0.1)"
+						if ( highlightedLinks.has( link ) ) return "rgba(255, 255, 255, 0.3)"
+						else return "rgba(255, 255, 255, 0.05)"
+					})
+				
+					// Forces
+					.d3Force( "x", d3.forceX( 0 ).strength( 0.05 ) )
+					.d3Force( "y", d3.forceY( 0 ).strength( 0.05 ) )
+
+					// On hover
+					.onNodeHover( node => {
+						highlightedNodes.clear()
+						highlightedLinks.clear()
+
+						if ( node ) {
+							highlightedNodes.add( node )
+							for ( const neighbor of node.neighbors ) {
+								highlightedNodes.add( neighbor )
+							}
+							for ( const link of node.links ) {
+								highlightedLinks.add( link )
+							}
+						}
+					})
+
+					.onLinkHover( link => {
+						highlightedNodes.clear()
+						highlightedLinks.clear()
+
+						if ( link ) {
+							highlightedLinks.add( link )
+							highlightedNodes.add( link.source )
+							highlightedNodes.add( link.target )
+						}
+					})
+			})
+		</script>
+	</body>
+</html>
